@@ -1,0 +1,9 @@
+.idea
+go.mod
+node_modules
+.env
+yarn-error.log
+data/*
+!data/.gitkeep
+dist/*
+coverage/*

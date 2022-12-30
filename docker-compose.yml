@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+    app:
+        container_name: comissioner
+        build:
+            context: .
+            dockerfile: Dockerfile
+        restart: always
+        env_file:
+            - .env
+        volumes:
+            - ./data:/app/data
+        command: ["node", "/app/dist/index.js"]
