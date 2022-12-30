@@ -15,7 +15,7 @@ export class sqliteConnector {
 
 	public async migrate() {
 		const sqlMigrations: string[] = [
-			`CREATE TABLE IF NOT EXISTS gas_history (blockId INTEGER PRIMARY KEY, baseFee REAL)`,
+			`CREATE TABLE IF NOT EXISTS gas_history (block_id INTEGER PRIMARY KEY, base_fee REAL)`,
 			`CREATE TABLE IF NOT EXISTS user_pools
 			(
 				address      TEXT,
@@ -25,6 +25,18 @@ export class sqliteConnector {
 				pool_meta    TEXT,
 				constraint user_pools_pk
 					primary key (address, pool_index)
+			)`,
+			`CREATE TABLE IF NOT EXISTS uniswap_pools
+			(
+				chain_id        INTEGER,
+				factory_address TEXT,
+				token0          TEXT,
+				token1          TEXT,
+				pool_fee 		REAL,
+				pool_address    TEXT,
+				pool_name       TEXT,
+				constraint uniswap_pools_pk
+					primary key (chain_id, factory_address, token1, token0, pool_fee)
 			)`,
 		]
 		for (const sql of sqlMigrations) {

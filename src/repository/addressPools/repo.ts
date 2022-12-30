@@ -45,7 +45,7 @@ export class AddressPoolsRepo {
 		return this.loadPools(sql, [address])
 	}
 
-	private async loadPools(sql: string, params:any[]): Promise<Map<number, poolData>> {
+	private async loadPools(sql: string, params: string[]): Promise<Map<number, poolData>> {
 		return new Promise((resolve) => {
 			this.db.all(sql, params, (err, rows) => {
 				const result = new Map<number, poolData>()

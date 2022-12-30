@@ -8,6 +8,7 @@ import { createAlchemyWeb3 } from "@alch/alchemy-web3"
 import { ethers } from "ethers"
 import { AddressPools } from "./service/uniswap/addressPools"
 import { AddressPoolsRepo } from "./repository/addressPools/repo"
+import { PoolsRepo } from "./repository/pools/repo"
 /* eslint-disable */
 require("dotenv").config()
 
@@ -19,29 +20,31 @@ export async function index(): Promise<void> {
 		throw new Error("ADDRESS is not set. This is used to get positions")
 	}
 
+	console.log("init database and migrate tables")
 	const db = new sqliteConnector()
 	await db.migrate()
 
+	console.log("database repository initialization...")
 	const gasHistoryRepo = new GasHistoryRepo(db.connect())
-	const poolRepo = new AddressPoolsRepo(db.connect())
+	const addressPoolsRepo = new AddressPoolsRepo(db.connect())
+	const poolsRepo = new PoolsRepo(db.connect())
 
+	console.log("web3 providers initialization...")
 	const web3 = createAlchemyWeb3(process.env.ALCHEMY_RPC_URL)
 	const etherscanProvider = new ethers.providers.EtherscanProvider(
 		SupportedChainId.MAINNET,
 		process.env.ETHERSCAN_API_KEY || ""
 	)
 
-	const addressPool = new AddressPools(poolRepo, web3, etherscanProvider)
-	await addressPool.getPositions(process.env.ADDRESS, SupportedChainId.MAINNET)
-
-	notifyTelegram("comissioner service started")
-
-	// process.on("SIGTERM", () => {
-	// 	console.log("SIGTERM signal received. Closing db connect.")
-	// 	db.close()
-	// })
-
+	console.log("app services initialization...")
+	const addressPool = new AddressPools(addressPoolsRepo, poolsRepo, web3, etherscanProvider)
 	const gasStation = new GasStation(gasHistoryRepo, web3)
+
+	console.log("app state preparation...")
+	console.log("load address pools positions")
+	const activePools = await addressPool.getPositions(process.env.ADDRESS, SupportedChainId.MAINNET)
+
+	// handle new blocks and store gas price to history
 	web3.eth.subscribe("newBlockHeaders", (err, result) => {
 		if (err) {
 			throw new Error("error while subscribe to new block: " + err.message)
@@ -51,8 +54,14 @@ export async function index(): Promise<void> {
 			gasStation.handleNewBlock(result.number, result.baseFeePerGas)
 		}
 	})
+	console.log("load missed block price to history")
 	await gasStation.checkMissedHistory()
 
+	// process.on("SIGTERM", () => {
+	// 	console.log("SIGTERM signal received. Closing db connect.")
+	// 	db.close()
+	// })
+	notifyTelegram("comissioner service started")
 	await gasPriceResolverV3(SupportedChainId.MAINNET, etherscanProvider, web3, gasStation)
 	return Promise.resolve()
 }
