@@ -19,7 +19,7 @@ const BIG_NUMBER_GWEI_MULTIPLIER = new BigNumber("1000000000") // 1_000_000_000
 //const BIG_NUMBER_GWEI_MULTIPLIER = new BigNumber("100000000")
 const BIG_NUMBER_ETH_MULTIPLIER = new BigNumber("1")
 
-const toBigNumber = {
+export const toBigNumber = {
 	hex: (n: string | BigNumber) => new BigNumber(stripHexPrefix(n.toString()), 16),
 	dec: (n: string | BigNumber) => new BigNumber(String(n), 10),
 	BN: (n: string | BigNumber) => new BigNumber(n.toString(16), 16),

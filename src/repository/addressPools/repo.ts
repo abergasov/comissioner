@@ -1,5 +1,5 @@
 import { Database } from "sqlite3"
-import { poolData } from "../../models/poolData"
+import { poolData, poolMeta } from "../../models/poolData"
 
 export class AddressPoolsRepo {
 	private readonly db: Database
@@ -21,10 +21,11 @@ export class AddressPoolsRepo {
 	public async addPool(pool: poolData): Promise<void> {
 		const poolActive = pool.active ? 1 : 0
 		const sql = `INSERT INTO ${AddressPoolsRepo.TABLE_NAME} (address, pool_index, pool_id, pool_active, pool_meta) VALUES (?, ?, ?, ?, ?) ON CONFLICT (address, pool_index) DO UPDATE SET pool_active = ?, pool_meta = ?`
+		const metaJSON = JSON.stringify(pool.poolMeta)
 		return new Promise((resolve) => {
 			this.db.run(
 				sql,
-				[pool.address, pool.poolIndex, pool.poolId, poolActive, pool.poolMeta, poolActive, pool.poolMeta],
+				[pool.address, pool.poolIndex, pool.poolId, poolActive, metaJSON, poolActive, metaJSON],
 				(err) => {
 					if (err) {
 						throw new Error("error load existing pools: " + err.message)
@@ -33,6 +34,15 @@ export class AddressPoolsRepo {
 				}
 			)
 		})
+	}
+
+	public async loadPool(poolId: number): Promise<poolData> {
+		const sql = `SELECT * FROM ${AddressPoolsRepo.TABLE_NAME} WHERE pool_id = ?`
+		const pools = await this.loadPools(sql, [poolId.toString()])
+		if (pools.size === 0) {
+			throw new Error("pool not found")
+		}
+		return pools.values().next().value
 	}
 
 	public async loadActivePools(address: string): Promise<Map<number, poolData>> {
@@ -57,7 +67,7 @@ export class AddressPoolsRepo {
 						address: row.address,
 						poolIndex: row.pool_index,
 						poolId: row.pool_id,
-						poolMeta: row.pool_meta,
+						poolMeta: JSON.parse(row.pool_meta) as poolMeta,
 						active: row.pool_active === 1,
 					})
 				}

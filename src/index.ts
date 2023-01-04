@@ -6,9 +6,10 @@ import { GasHistoryRepo } from "./repository/gasHistory/repo"
 import { GasStation } from "./service/gasoline/gasStation"
 import { createAlchemyWeb3 } from "@alch/alchemy-web3"
 import { ethers } from "ethers"
-import { AddressPools } from "./service/uniswap/addressPools"
+import { UniPooler } from "./service/uniswap/uniPooler"
 import { AddressPoolsRepo } from "./repository/addressPools/repo"
 import { PoolsRepo } from "./repository/pools/repo"
+import { TokenPricer } from "./service/pricer/tokenPricer"
 /* eslint-disable */
 require("dotenv").config()
 
@@ -37,12 +38,22 @@ export async function index(): Promise<void> {
 	)
 
 	console.log("app services initialization...")
-	const addressPool = new AddressPools(addressPoolsRepo, poolsRepo, web3, etherscanProvider)
+	const pricer = new TokenPricer(process.env.CRYPTOCOMPARE_API_KEY || "")
+	pricer.addTokenToWatch("ETH")
+	const uniPooler = new UniPooler(
+		SupportedChainId.MAINNET,
+		addressPoolsRepo,
+		poolsRepo,
+		web3,
+		etherscanProvider,
+		pricer
+	)
 	const gasStation = new GasStation(gasHistoryRepo, web3)
 
 	console.log("app state preparation...")
 	console.log("load address pools positions")
-	const activePools = await addressPool.getPositions(process.env.ADDRESS, SupportedChainId.MAINNET)
+	await uniPooler.loadAddressPools(process.env.ADDRESS)
+	uniPooler.observePools()
 
 	// handle new blocks and store gas price to history
 	web3.eth.subscribe("newBlockHeaders", (err, result) => {
@@ -62,7 +73,7 @@ export async function index(): Promise<void> {
 	// 	db.close()
 	// })
 	notifyTelegram("comissioner service started")
-	await gasPriceResolverV3(SupportedChainId.MAINNET, etherscanProvider, web3, gasStation)
+	await gasPriceResolverV3(SupportedChainId.MAINNET, etherscanProvider, web3, gasStation, uniPooler)
 	return Promise.resolve()
 }
 

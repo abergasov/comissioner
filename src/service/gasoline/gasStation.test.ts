@@ -99,11 +99,8 @@ describe("decideIsPriceGood", () => {
 	]
 
 	test.each(table.map((testCase) => [testCase.name, testCase]))("%s", async (_, tCase) => {
-		mockRepo.loadAllBlocks = jest.fn().mockReturnValueOnce([tCase.mockedBlocks, null])
+		mockRepo.loadAllBlocks = jest.fn().mockReturnValueOnce(tCase.mockedBlocks)
 		await gasStation.loadGasValueFromHistory()
-		if (tCase.expectedDecision) {
-			console.log("expectedDecision")
-		}
 		const result = gasStation.decideIsPriceGood(tCase.mockFee)
 		expect(result).toBe(tCase.expectedDecision)
 	})

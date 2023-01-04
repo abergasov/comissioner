@@ -46,7 +46,7 @@ export class PoolsRepo {
 					throw new Error("error while load uniswap pools: " + err.message)
 				} else {
 					if (row) {
-						resolve(row.address)
+						resolve(row.pool_address)
 					}
 					resolve(undefined)
 				}

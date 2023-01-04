@@ -5,7 +5,7 @@ export interface poolData {
 	poolIndex: number
 	poolId: number
 	active: boolean
-	poolMeta: string
+	poolMeta: poolMeta
 }
 
 export interface poolMeta {

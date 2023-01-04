@@ -10,6 +10,6 @@ export function getNFTManager(chainId: number, provider: Provider): Contract {
 }
 
 // getPoolStateManagerForAddress is used to get position details
-export function getPoolStateManagerForAddress(chainId: number, provider: Provider, address: string): Contract {
+export function getPoolStateManagerForAddress(provider: Provider, address: string): Contract {
 	return new ethers.Contract(address, IUniswapV3PoolStateABI, provider)
 }
