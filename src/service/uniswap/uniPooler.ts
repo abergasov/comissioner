@@ -233,9 +233,6 @@ export class UniPooler {
 			const currentMaxFee = toNormalizedDenomination[EthDenomination.WEI](toBigNumber.dec(amountMaxFee))
 
 			const ethPrice = this.pricer.getTokenPrice("ETH")
-			console.log("ethPrice", ethPrice.toString())
-			console.log("currentBaseFee", currentBaseFee.toString())
-			console.log("currentMaxFee", currentMaxFee.toString())
 
 			const baseFeeUSD = currentBaseFee.div(ethPrice)
 			const maxFeeUSD = currentMaxFee.div(ethPrice)
@@ -263,7 +260,7 @@ export class UniPooler {
 	public async observePools(): Promise<void> {
 		for (;;) {
 			try {
-				console.log("Start observing pools")
+				console.log("start observing pools")
 				await this.loadPoolsFees()
 			} catch (error) {
 				console.error("Error when updating pools", error)
