@@ -1,15 +1,15 @@
 import { Database } from "sqlite3"
 import path from "path"
 
-export class sqliteConnector {
-	private static DB_PATH = "data/storage.db"
+export class SqliteConnector {
+	public static DB_PATH = "data/storage.db"
 
 	private readonly dbPath: string
 	private readonly db: Database | undefined
 	private migrated = false
 
-	constructor() {
-		this.dbPath = path.join(process.cwd(), sqliteConnector.DB_PATH)
+	constructor(dbFolder: string, dbName: string) {
+		this.dbPath = path.join(dbFolder, dbName)
 		this.db = new Database(this.dbPath)
 	}
 

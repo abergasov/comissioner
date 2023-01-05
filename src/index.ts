@@ -1,7 +1,7 @@
 import { gasPriceResolverV3 } from "./service/gasoline/checker_v3"
 import { notifyTelegram } from "./utils/telegramNotifyer"
 import { SupportedChainId } from "./constants/uniswap/chains"
-import { sqliteConnector } from "./storage/database/sqlite3"
+import { SqliteConnector } from "./storage/database/sqlite3"
 import { GasHistoryRepo } from "./repository/gasHistory/repo"
 import { GasStation } from "./service/gasoline/gasStation"
 import { createAlchemyWeb3 } from "@alch/alchemy-web3"
@@ -22,7 +22,7 @@ export async function index(): Promise<void> {
 	}
 
 	console.log("init database and migrate tables")
-	const db = new sqliteConnector()
+	const db = new SqliteConnector(process.cwd(), SqliteConnector.DB_PATH)
 	await db.migrate()
 
 	console.log("database repository initialization...")
