@@ -10,6 +10,7 @@ import { UniPooler } from "./service/uniswap/uniPooler"
 import { AddressPoolsRepo } from "./repository/addressPools/repo"
 import { PoolsRepo } from "./repository/pools/repo"
 import { TokenPricer } from "./service/pricer/tokenPricer"
+import {FeeLogerRepo} from "./repository/feeLog/repo";
 /* eslint-disable */
 require("dotenv").config()
 
@@ -29,6 +30,7 @@ export async function index(): Promise<void> {
 	const gasHistoryRepo = new GasHistoryRepo(db.connect())
 	const addressPoolsRepo = new AddressPoolsRepo(db.connect())
 	const poolsRepo = new PoolsRepo(db.connect())
+	const feedLog = new FeeLogerRepo(db.connect())
 
 	console.log("web3 providers initialization...")
 	const web3 = createAlchemyWeb3(process.env.ALCHEMY_RPC_URL)
@@ -40,14 +42,7 @@ export async function index(): Promise<void> {
 	console.log("app services initialization...")
 	const pricer = new TokenPricer(process.env.CRYPTOCOMPARE_API_KEY || "")
 	pricer.addTokenToWatch("ETH")
-	const uniPooler = new UniPooler(
-		SupportedChainId.MAINNET,
-		addressPoolsRepo,
-		poolsRepo,
-		web3,
-		etherscanProvider,
-		pricer
-	)
+	const uniPooler = new UniPooler(SupportedChainId.MAINNET, addressPoolsRepo, poolsRepo, etherscanProvider, pricer, feedLog)
 	const gasStation = new GasStation(gasHistoryRepo, web3)
 
 	console.log("app state preparation...")
@@ -73,7 +68,7 @@ export async function index(): Promise<void> {
 	// 	db.close()
 	// })
 	notifyTelegram("comissioner service started")
-	await gasPriceResolverV3(SupportedChainId.MAINNET, etherscanProvider, web3, gasStation, uniPooler)
+	await gasPriceResolverV3(etherscanProvider, web3, gasStation, uniPooler)
 	return Promise.resolve()
 }
 

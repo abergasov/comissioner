@@ -9,7 +9,6 @@ import { UniPooler } from "../uniswap/uniPooler"
 import { FeeData } from "@ethersproject/providers"
 
 export async function gasPriceResolverV3(
-	chainId: number,
 	etherscanProvider: ethers.providers.EtherscanProvider,
 	web3: AlchemyWeb3,
 	gasStation: GasStation,
@@ -25,24 +24,26 @@ export async function gasPriceResolverV3(
 		const currentBaseFee = toNormalizedDenomination[EthDenomination.GWEI](baseFee)
 		if (gasStation.decideIsPriceGood(currentBaseFee.toNumber())) {
 			console.log("Current base fee is good: ", currentBaseFee.toNumber())
-			calculatePrices(chainId, etherscanProvider, result, uniPooler)
+			calculatePrices(etherscanProvider, result, uniPooler)
 		}
 	})
 }
 
 async function calculatePrices(
-	chainId: number,
 	provider: ethers.providers.EtherscanProvider,
 	blockHeader: BlockHeader,
 	uniPooler: UniPooler
 ) {
-	const [fees, ethPrice] = await Promise.all([provider.getFeeData(), provider.getEtherPrice()])
+	const fees = await provider.getFeeData()
 
 	const [baseFee, maxFee] = getBaseAndMaxFeePerGas(fees, blockHeader)
 	const pools = uniPooler.getPoolsWithFeesReadyToCollect(baseFee, maxFee, +(process.env.COLLECT_FEES_AFTER_X || 10))
 	if (pools.length === 0) {
 		return
 	}
+
+	console.log(`try collect fees from pool: ${pools[0].poolId}`)
+	await uniPooler.collectFees(pools[0].poolId, fees)
 
 	//const nftManagerContract = getNFTManager(chainId, provider)
 	// estimate gas for collect method

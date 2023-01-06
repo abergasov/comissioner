@@ -1,8 +1,7 @@
 import { BigNumber, ethers } from "ethers"
 import { Pool } from "@uniswap/v3-sdk"
 import { Currency, CurrencyAmount } from "@uniswap/sdk-core"
-
-const MAX_UINT128 = BigNumber.from(2).pow(128).sub(1)
+import { MAX_UINT128 } from "../../constants/constants"
 
 export async function getPositionFeesV3(
 	nftManagerContract: ethers.Contract,

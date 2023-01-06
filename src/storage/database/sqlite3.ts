@@ -38,6 +38,21 @@ export class SqliteConnector {
 				constraint uniswap_pools_pk
 					primary key (chain_id, factory_address, token1, token0, pool_fee)
 			)`,
+			`CREATE TABLE IF NOT EXISTS fees_collecting_log
+			(
+				tx_hash               TEXT
+					constraint fees_collecting_log_pk
+						primary key,
+				pool_id               INTEGER,
+				created_at            TEXT,
+				token_a               TEXT,
+				token_b               TEXT,
+				token_a_amount_before TEXT,
+				token_b_amount_before TEXT,
+				token_a_amount_after  TEXT,
+				token_b_amount_after  TEXT
+			)`,
+			`CREATE INDEX IF NOT EXISTS fees_collecting_log_pool_id_index on fees_collecting_log (pool_id)`,
 		]
 		for (const sql of sqlMigrations) {
 			this.db?.exec(sql)

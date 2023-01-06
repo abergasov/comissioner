@@ -1,7 +1,6 @@
 import { getNFTManager, getPoolStateManagerForAddress } from "./managers"
 import { ethers } from "ethers"
 import { AddressPoolsRepo } from "../../repository/addressPools/repo"
-import { AlchemyWeb3 } from "@alch/alchemy-web3"
 import { poolData, poolMeta } from "../../models/poolData"
 import { PoolsRepo } from "../../repository/pools/repo"
 import { computePoolAddress, FeeAmount, NonfungiblePositionManager, Pool } from "@uniswap/v3-sdk"
@@ -13,8 +12,11 @@ import { TokenPricer } from "../pricer/tokenPricer"
 import BigNumber from "bignumber.js"
 import { EthDenomination, toBigNumber, toNormalizedDenomination } from "../../utils/convert"
 import { notifyTelegram } from "../../utils/telegramNotifyer"
+import { FeeData } from "@ethersproject/providers"
+import { collectFees } from "./positionCollectFeesV3"
+import {feeLog, FeeLogerRepo} from "../../repository/feeLog/repo";
 
-interface poolContainer {
+export interface PoolContainer {
 	pool: Pool
 	poolId: number
 	poolState: PoolState
@@ -22,35 +24,37 @@ interface poolContainer {
 	collectFeesGas: BigNumber
 }
 
+// UniPooler keep in memory state of all pools and update it.
 export class UniPooler {
 	private readonly addressPoolsRepo: AddressPoolsRepo
 	private readonly uniPools: PoolsRepo
-	private readonly web3: AlchemyWeb3
-	private readonly provider: ethers.providers.EtherscanProvider
+	private readonly feedLog :FeeLogerRepo
+	private readonly provider: ethers.providers.Provider
 	private readonly nftManagerContract: ethers.Contract
 	private readonly pricer: TokenPricer
 	// service state
 	private readonly chainId: number
 	private activePools: Map<number, poolData>
-	private web3Pools: Map<number, poolContainer>
+	private web3Pools: Map<number, PoolContainer>
+	private isCollecting: boolean = false
 
 	constructor(
 		chainId: number,
 		repo: AddressPoolsRepo,
 		poolsRepo: PoolsRepo,
-		web3: AlchemyWeb3,
-		provider: ethers.providers.EtherscanProvider,
-		pricer: TokenPricer
+		provider: ethers.providers.Provider,
+		pricer: TokenPricer,
+		feedLog : FeeLogerRepo
 	) {
 		this.chainId = chainId
-		this.web3 = web3
 		this.provider = provider
 		this.addressPoolsRepo = repo
 		this.uniPools = poolsRepo
 		this.activePools = new Map<number, poolData>()
-		this.web3Pools = new Map<number, poolContainer>()
+		this.web3Pools = new Map<number, PoolContainer>()
 		this.nftManagerContract = getNFTManager(chainId, provider)
 		this.pricer = pricer
+		this.feedLog = feedLog
 	}
 
 	// loadAddressPools load pools for provided address. load uniswap pools from positions and create Pool objects in memory
@@ -108,7 +112,7 @@ export class UniPooler {
 	// getPool returns the pool for the given poolId. Store pool in memory.
 	public async getPool(poolId: number): Promise<[PoolState, Pool | null]> {
 		if (this.web3Pools.has(poolId)) {
-			const container = this.web3Pools.get(poolId) as poolContainer
+			const container = this.web3Pools.get(poolId) as PoolContainer
 			return [container.poolState, container.pool]
 		}
 		const poolMeta = await this.getPoolMetaByPoolId(poolId)
@@ -212,8 +216,12 @@ export class UniPooler {
 	// getPoolsWithFeesReadyToCollect returns pools with fees ready to collect.
 	// every pool has 2 fees - token0 and token1.
 	// check that total amount of fees X times more that gas price and it profitable to collect
-	public getPoolsWithFeesReadyToCollect(baseGaseFee: BigNumber, maxGasFee: BigNumber, multiplyTimes: number): Pool[] {
-		const result: Pool[] = []
+	public getPoolsWithFeesReadyToCollect(
+		baseGaseFee: BigNumber,
+		maxGasFee: BigNumber,
+		multiplyTimes: number
+	): PoolContainer[] {
+		const result: PoolContainer[] = []
 		const tgMessage: string[] = []
 		for (const [key, container] of this.web3Pools) {
 			if (container.poolState !== PoolState.EXISTS) {
@@ -244,7 +252,11 @@ export class UniPooler {
 			const isProfitable = container.poolFees.gte(maxFeeUSD.mul(multiplyTimes))
 			if (isProfitable) {
 				tgMessage.push(`pool ${p}: fees: ${f}$, base fee: ${bf}$, max fee: ${mf}$`)
-				result.push(container.pool)
+				result.push(container)
+				// reset pool fees to avoid double collecting
+				container.poolFees = new BigNumber("0")
+				container.collectFeesGas = new BigNumber("0")
+				break // collect fees only for one pool
 			} else {
 				console.log(
 					`pool ${p} is not profitable to collect fees. fees: ${f}$, current base fee: ${bf}$, max fee: ${mf}$`
@@ -257,13 +269,30 @@ export class UniPooler {
 		return result
 	}
 
+	public async collectFees(poolId: number, fees: FeeData): Promise<void> {
+		this.isCollecting = true
+		const container = this.web3Pools.get(poolId)
+		if (!container) {
+			throw new Error(`pool ${poolId} not found`)
+		}
+
+		const result = await collectFees(this.chainId, this.provider, poolId, container, fees)
+		if (result instanceof Error) {
+			this.isCollecting = false
+			return
+		}
+		this.isCollecting = false
+	}
+
 	public async observePools(): Promise<void> {
 		for (;;) {
-			try {
-				console.log("start observing pools")
-				await this.loadPoolsFees()
-			} catch (error) {
-				console.error("Error when updating pools", error)
+			if (!this.isCollecting) {
+				try {
+					console.log("start observing pools")
+					await this.loadPoolsFees()
+				} catch (error) {
+					console.error("Error when updating pools", error)
+				}
 			}
 			await new Promise((r) => setTimeout(r, 60 * 1000)) // wait minute
 		}
@@ -271,7 +300,7 @@ export class UniPooler {
 
 	// loadPoolsFees load pool states in background with some periodic interval
 	// estimate function gas price and fees total amount
-	private async loadPoolsFees(): Promise<void> {
+	public async loadPoolsFees(): Promise<void> {
 		for (const [key, container] of this.web3Pools) {
 			if (!container.pool) {
 				continue
