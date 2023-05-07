@@ -8,7 +8,7 @@ export class GasStation {
 	private static BLOCK_DURATION = 10 // approximate block duration in seconds
 	private static MAX_KEEP_BLOCKS = 3 * ((24 * 60 * 60) / GasStation.BLOCK_DURATION) // how many days in past store gas info
 	private static BLOCK_DOWNLOAD_BATCH_SIZE = 1024
-	private static PERCENTAGE = 75 // 75% of blocks should have higher price to run transaction
+	private static PERCENTAGE = 90 // 90% of blocks should have higher price to run transaction
 
 	private readonly repository: GasHistoryRepo
 	private readonly web3: AlchemyWeb3
